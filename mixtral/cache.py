@@ -69,7 +69,7 @@ class CacheView:
         assert xk.ndim == xv.ndim == 3 # (B * T, H, D)
         assert xk.shape == xv.shape
 
-        if all([s == 0 for s in self.metadata.seqlens]):
+        if all(s == 0 for s in self.metadata.seqlens):
             # No cache to interleave
             return xk, xv
 
@@ -174,7 +174,7 @@ class RotatingBufferCache:
         assert len(seqlens) == len(self.kv_seqlens), f"Batch size is {len(self.kv_seqlens)}, got {len(seqlens)}, did you forget to reset cache?"
         seqpos = self.kv_seqlens.tolist()
 
-        assert len(seqlens) > 0, seqlens
+        assert seqlens, seqlens
         masks = [
             [x >= seqlen - self.sliding_window for x in range(seqlen)]
             for seqlen in seqlens
@@ -182,13 +182,17 @@ class RotatingBufferCache:
         to_cache_mask = torch.tensor(sum(masks, []), device=self.device, dtype=torch.bool)
         cached_elements = torch.tensor([sum(mask) for mask in masks], device=self.device, dtype=torch.long)
         positions = torch.cat([torch.arange(pos, pos + seqlen) for pos, seqlen in zip(seqpos, seqlens)]).to(device=self.device, dtype=torch.long)
-        batch_idx = torch.tensor(sum([[i]*seqlen for i, seqlen in enumerate(seqlens)], []), device=self.device, dtype=torch.long)
+        batch_idx = torch.tensor(
+            sum(([i] * seqlen for i, seqlen in enumerate(seqlens)), []),
+            device=self.device,
+            dtype=torch.long,
+        )
         cache_positions = positions % self.sliding_window + batch_idx * self.sliding_window
 
         first_prefill = seqpos[0] == 0
         subsequent_prefill = any(seqlen > 1 for seqlen in seqlens)
         if first_prefill:
-            assert all([pos == 0 for pos in seqpos]), (seqpos)
+            assert all(pos == 0 for pos in seqpos), seqpos
             mask = BlockDiagonalCausalMask.from_seqlens(seqlens).make_local_attention(self.sliding_window)
         elif subsequent_prefill:
             mask = BlockDiagonalMask.from_seqlens(
