@@ -43,7 +43,7 @@ def generate(prompts: List[str], model: Transformer, tokenizer: Tokenizer, *, ma
     cache = RotatingBufferCache(model.args.n_layers, model.args.max_batch_size, cache_window, model.args.n_kv_heads, model.args.head_dim)
     cache.to(device=model.device, dtype=model.dtype)
     cache.reset()
-    
+
     # Bookkeeping
     logprobs = [[] for _ in range(B)]
     last_token_prelogits = None
@@ -84,7 +84,7 @@ def generate(prompts: List[str], model: Transformer, tokenizer: Tokenizer, *, ma
 
     # decode
     generated_tokens = []
-    for i_token in range(max_tokens):
+    for _ in range(max_tokens):
         next_token = sample(last_token_prelogits, temperature=temperature, top_p=0.8)
 
         last_token_logits = torch.log_softmax(last_token_prelogits, dim=-1)
@@ -103,9 +103,10 @@ def generate(prompts: List[str], model: Transformer, tokenizer: Tokenizer, *, ma
     generated_words = []
     if generated_tokens:
         generated_tokens = torch.cat(generated_tokens, 1)
-        for i, x in enumerate(encoded_prompts):
-            generated_words.append(tokenizer.decode(x + generated_tokens[i].tolist()))
-
+        generated_words.extend(
+            tokenizer.decode(x + generated_tokens[i].tolist())
+            for i, x in enumerate(encoded_prompts)
+        )
     return generated_words, logprobs
 
 

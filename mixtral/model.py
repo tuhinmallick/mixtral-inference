@@ -230,8 +230,7 @@ class TransformerBlock(nn.Module):
         r = self.attention.forward(self.attention_norm(x), freqs_cis, cache)
         h = x + r
         r = self.feed_forward.forward(self.ffn_norm(h))
-        out = h + r
-        return out
+        return h + r
 
 
 class Transformer(nn.Module):
